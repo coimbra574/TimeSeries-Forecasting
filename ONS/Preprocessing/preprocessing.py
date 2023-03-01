@@ -2,40 +2,42 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import shutil
 from datetime import datetime
 from statsmodels.tsa.seasonal import seasonal_decompose
 import wandb
 
 
-def load_df(path):
-	df = pd.DataFrame()
-	for file in os.listdir(path):
-		data = pd.read_excel(path + '/' + file)
-		df = pd.concat([df, data])
-	return df
+
+def load_and_process(dataset_name, artifact_name):
+
+	run = wandb.init(project="Mestrado")
+	artifact = run.use_artifact(artifact_name, type='dataset')
+	artifact_dir = artifact.download()
+
+	values = np.load(artifact_dir + "/" + dataset_name + ".npy", allow_pickle=True)
 
 
-def process_and_save(df):
-	df_sudeste = df[df['nom_subsistema'] == 'SUDESTE']
+	df = pd.DataFrame(values, columns=['sigla_regiao', 'regiao', 'data', 'carga'])
 
-	# Find for any duplicated values
-	sum(df_sudeste['din_instante'].duplicated())
+	# Filter only from Sudeste
+	df_sudeste = df[df['regiao'] == 'SUDESTE']
 
-	# Preprocess
-	df_sudeste = df_sudeste.drop(['id_subsistema','nom_subsistema'], axis=1)
-	df_sudeste = df_sudeste.rename(columns={'din_instante': 'data', 'val_cargaenergiamwmed': 'carga'})
+	# # Look for any duplicated values
+	print(f'Duplicated values = {sum(df_sudeste.carga.duplicated())}\n')
+
+	# # Preprocess
+	df_sudeste = df_sudeste.drop(['sigla_regiao','regiao'], axis=1)
+	df_sudeste = df_sudeste.dropna()
+	df_sudeste = df_sudeste[df_sudeste.data.dt.year >= 2002]
+	df_sudeste = df_sudeste.sort_values(by='data')
 	df_sudeste = df_sudeste.reset_index()
 	df_sudeste = df_sudeste.drop('index', axis=1)
-	df_sudeste = df_sudeste.dropna()
-	df_sudeste = df_sudeste[df_sudeste['data'].dt.year >= 2002]
-	df_sudeste = df_sudeste.sort_values(by='data')
-	#draw_plot(df_sudeste)
+	print(df_sudeste.head())
 
-	# Add preprocessed dataset to wandb
-	np.save("energy_demand_sudeste.npy", np.array(df_sudeste))
-	artifact = wandb.Artifact(name="preprocessed_dataset", type="dataset")
-	artifact.add_file("energy_demand_sudeste.npy")
+	draw_plot(df_sudeste)
 
+	return df_sudeste
 
 
 
@@ -63,13 +65,21 @@ def draw_plot(df_sudeste):
 
 if __name__ == '__main__':
 
+	dataset_name = "energy_demand"
+	artifcat_name = "coimbra574/Mestrado/loaded_dataset:latest"
+	path_to_preprocessed = "/home/taina/Desktop/Mestrado/Datasets/Dados_ONS"
+
 	wandb.init(project="Mestrado")
-
-	dataset_path = '/home/taina/Desktop/Mestrado/Datasets/ONS/Dados ONS'
-
-	df = load_df(dataset_path)
-	process_and_save(df)
+	df = load_and_process(dataset_name, artifcat_name)
 	wandb.finish()
+
+	# Save preprocessed pickle dataframe
+	df.to_pickle(path_to_preprocessed + '/' + 'energy_demand_preprocessed.pkl')
+
+	# Remove all wandb files
+	shutil.rmtree('wandb')
+	shutil.rmtree('artifacts')
+
 
 
 
