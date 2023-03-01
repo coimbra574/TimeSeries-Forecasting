@@ -66,11 +66,11 @@ def draw_plot(df_sudeste):
 if __name__ == '__main__':
 
 	dataset_name = "energy_demand"
-	artifcat_name = "coimbra574/Mestrado/loaded_dataset:latest"
+	artifact_name = "coimbra574/Mestrado/loaded_dataset:latest"
 	path_to_preprocessed = "/home/taina/Desktop/Mestrado/Datasets/Dados_ONS"
 
 	wandb.init(project="Mestrado")
-	df = load_and_process(dataset_name, artifcat_name)
+	df = load_and_process(dataset_name, artifact_name)
 	wandb.finish()
 
 	# Save preprocessed pickle dataframe
